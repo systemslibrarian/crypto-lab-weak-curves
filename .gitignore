@@ -4,6 +4,10 @@ dist
 *.local
 playwright-report
 test-results
+
+# Written by the two CI steps that read their own runner's summary line.
+vitest.log
+playwright.log
 public/deployment.json
 chat.md
 CRYPTO-LAB-TEMPLATE*.md

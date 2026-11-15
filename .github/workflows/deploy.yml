@@ -43,13 +43,31 @@ jobs:
           printf '{"source_sha":"%s","repository":"%s"}\n' "$GITHUB_SHA" "$GITHUB_REPOSITORY" > public/deployment.json
 
       - name: Unit tests (Vitest, incl. the published worked examples)
-        # The count is asserted, not just the exit code: a runner that collects
-        # zero files exits 0, and a green log reading "0 passed" is the hazard
-        # §4.1e of the template names.
+        # `shell: bash` because `set -o pipefail` is not POSIX: the browser-gate
+        # job below runs in a container whose /bin/sh is dash, where that line
+        # aborts the step with "Illegal option -o pipefail" before any test runs.
+        shell: bash
+        env:
+          # The summary line is what this step reads, and vitest decorates it
+          # with ANSI colour even through a pipe — so a regex written against
+          # the plain text matches nothing and a fully passing run fails here.
+          # Asking for no colour is the fix; the stripper below is the belt.
+          NO_COLOR: '1'
+          FORCE_COLOR: '0'
         run: |
-          set -o pipefail
+          set -euo pipefail
           npm test 2>&1 | tee vitest.log
-          grep -E 'Tests +[1-9][0-9]* passed' vitest.log
+          plain() { sed -r 's/\x1B\[[0-9;]*[a-zA-Z]//g' vitest.log; }
+          # A runner that collects NO files exits 0, so the exit status alone is
+          # not evidence. Assert the collected FILE count against the files on
+          # disk: that catches a glob which silently stopped matching, which a
+          # ">= 1 test passed" floor would not.
+          on_disk=$(find src -name '*.test.ts' | wc -l | tr -d ' ')
+          collected=$(plain | grep -oE 'Test Files +[0-9]+ passed' | grep -oE '[0-9]+' | head -1 || true)
+          passed=$(plain | grep -oE 'Tests +[0-9]+ passed' | grep -oE '[0-9]+' | head -1 || true)
+          echo "vitest collected ${collected:-0} of ${on_disk} test files and passed ${passed:-0} tests"
+          test "${collected:-0}" = "${on_disk}"
+          test "${passed:-0}" -ge 1
 
       - name: Build (maintenance controls + typecheck gate the build)
         run: npm run build
@@ -95,10 +113,26 @@ jobs:
       - name: Browser gate (accessibility, WCAG 2.1 A/AA, and the claims suite)
         # Both projects: `test:a11y` alone would skip the claims suite, and the
         # gate a bump auto-merges against must be the gate the deploy runs.
+        #
+        # `shell: bash` is required, not cosmetic: this job runs in the
+        # Playwright container, whose /bin/sh is dash, and `set -o pipefail`
+        # aborts there with "Illegal option" before a single test runs.
+        shell: bash
+        env:
+          NO_COLOR: '1'
+          FORCE_COLOR: '0'
         run: |
-          set -o pipefail
+          set -euo pipefail
           CI=1 npm run test:e2e:all 2>&1 | tee playwright.log
-          grep -E '^ +[1-9][0-9]* passed' playwright.log
+          plain() { sed -r 's/\x1B\[[0-9;]*[a-zA-Z]//g' playwright.log; }
+          passed=$(plain | grep -oE '^ +[0-9]+ passed' | grep -oE '[0-9]+' | tail -1 || true)
+          echo "playwright passed ${passed:-0} tests"
+          test "${passed:-0}" -ge 1
+          # Both PROJECTS must have run. `playwright test` with a config whose
+          # projects stopped matching any file exits 0 having run nothing, and
+          # the name of the script says nothing about what it covered.
+          plain | grep -q '\[a11y\]'
+          plain | grep -q '\[claims\]'
 
   deploy:
     needs: [build, browser-gate]

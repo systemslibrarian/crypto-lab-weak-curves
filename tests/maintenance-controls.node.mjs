@@ -82,10 +82,27 @@ test('pull requests run the WHOLE gate — unit suite, build, a11y AND claims �
   const build = job('build');
   const browser = job('browser-gate');
   assert.match(build, /npm test 2>&1 \| tee vitest\.log/);
-  assert.match(build, /grep -E 'Tests \+\[1-9\]\[0-9\]\* passed' vitest\.log/);
   assert.match(build, /run: npm run build/);
   assert.match(browser, /npm run test:e2e:all/);
-  assert.match(browser, /grep -E '\^ \+\[1-9\]\[0-9\]\* passed' playwright\.log/);
+
+  // Each test step must ASSERT ITS COUNT, not just its exit status: a runner
+  // that collects no files exits 0. And each must run under bash — the browser
+  // job's container shell is dash, where `set -o pipefail` aborts the step
+  // before any test runs, which reads as a failing gate and is not one.
+  for (const [name, step] of [['build', build], ['browser-gate', browser]]) {
+    assert.match(step, /shell: bash/, `${name} must not rely on the default shell`);
+    assert.match(step, /set -euo pipefail/, `${name} must fail on a failing pipe`);
+    assert.match(step, /NO_COLOR: '1'/, `${name} reads a summary line, so it must ask for undecorated output`);
+    assert.match(step, /sed -r 's\/\\x1B/, `${name} must strip ANSI before reading its summary line`);
+    assert.match(step, /-ge 1/, `${name} must assert a non-zero test count`);
+  }
+  // The unit step compares the files COLLECTED against the files on disk, which
+  // catches a glob that quietly stopped matching; the browser step asserts both
+  // projects appear in the log.
+  assert.match(build, /find src -name '\*\.test\.ts'/);
+  assert.match(build, /test "\$\{collected:-0\}" = "\$\{on_disk\}"/);
+  assert.match(browser, /grep -q '\\\[a11y\\\]'/);
+  assert.match(browser, /grep -q '\\\[claims\\\]'/);
   assert.doesNotMatch(browser, /playwright install|--with-deps/);
   assert.match(build, /name: Upload Pages artifact\n\s+if: github\.event_name != 'pull_request'/);
   assert.match(job('dependabot-auto-merge'), /needs: \[build, browser-gate\]/);
