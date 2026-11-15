@@ -1,0 +1,196 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A pull-request run must never cancel a live main deployment.
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies exactly from the lockfile
+        run: npm ci
+
+      - name: Stamp the artifact with its exact source revision
+        run: |
+          mkdir -p public
+          printf '{"source_sha":"%s","repository":"%s"}\n' "$GITHUB_SHA" "$GITHUB_REPOSITORY" > public/deployment.json
+
+      - name: Unit tests (Vitest, incl. the published worked examples)
+        # The count is asserted, not just the exit code: a runner that collects
+        # zero files exits 0, and a green log reading "0 passed" is the hazard
+        # §4.1e of the template names.
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee vitest.log
+          grep -E 'Tests +[1-9][0-9]* passed' vitest.log
+
+      - name: Build (maintenance controls + typecheck gate the build)
+        run: npm run build
+
+      - name: Configure Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: dist
+
+  # The image carries the exact browser binaries and Linux libraries expected
+  # by Playwright 1.65.1. Pin the multi-architecture manifest by digest so the
+  # rendering/runtime environment cannot drift under an unchanged commit.
+  browser-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
+      options: --ipc=host
+    env:
+      HOME: /root
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies exactly from the lockfile
+        run: npm ci
+
+      - name: Browser gate (accessibility, WCAG 2.1 A/AA, and the claims suite)
+        # Both projects: `test:a11y` alone would skip the claims suite, and the
+        # gate a bump auto-merges against must be the gate the deploy runs.
+        run: |
+          set -o pipefail
+          CI=1 npm run test:e2e:all 2>&1 | tee playwright.log
+          grep -E '^ +[1-9][0-9]* passed' playwright.log
+
+  deploy:
+    needs: [build, browser-gate]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
+
+      - name: Verify served Pages bytes match the deployed revision
+        env:
+          LIVE_URL: https://systemslibrarian.github.io/crypto-lab-weak-curves/
+        run: |
+          set -eu
+          for attempt in $(seq 1 18); do
+            result=$(curl -fsSL --connect-timeout 8 --max-time 15 -H 'Cache-Control: no-cache' "${LIVE_URL}deployment.json?sha=${GITHUB_SHA}" 2>/dev/null || true)
+            if node -e 'try { const p=JSON.parse(process.argv[1]);process.exit(p.source_sha===process.argv[2]&&p.repository===process.argv[3]?0:1) } catch { process.exit(1) }' "$result" "$GITHUB_SHA" "$GITHUB_REPOSITORY"; then
+              html=$(curl -fsSL --connect-timeout 8 --max-time 15 -H 'Cache-Control: no-cache' "${LIVE_URL}?sha=${GITHUB_SHA}" 2>/dev/null || true)
+              if printf '%s' "$html" | grep -Fq 'id="app"'; then
+                echo "Verified live HTML and source revision $GITHUB_SHA at $LIVE_URL"
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo "::error::Live Pages failed source-SHA/HTML verification"
+          exit 1
+
+  # Dependabot only. The complete build gate decides whether a bump is safe;
+  # this job then merges and explicitly dispatches the main deployment.
+  dependabot-auto-merge:
+    needs: [build, browser-gate]
+    if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - id: bump
+        name: Read the bump type from the pull request itself
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        # No third-party action in the merge path, and no API call either: the
+        # versions come from the pull request's own text, which the triggering
+        # event already carries, judged by an in-repo script that answers
+        # major / non-major / unknown. Only non-major merges; unknown waits for a
+        # person, which is what a grouped pull request with no versions, a
+        # retitled one, or a missing body all come to.
+        #
+        # The title and body are ATTACKER-CONTROLLED, so they reach the script
+        # only through env and are never interpolated into this script. A ${{ }}
+        # in a `run:` block is substituted before bash reads the line, so a
+        # crafted title would become shell source; an env value is data to bash
+        # and never source.
+        run: |
+          set -eu
+          node .github/scripts/bump-type.mjs | tee -a "$GITHUB_OUTPUT"
+      - name: Merge any bump whose gate went green
+        if: steps.bump.outputs.bump == 'non-major'
+        run: |
+          set -eu
+          merged=""
+          for attempt in 1 2 3; do
+            if gh pr merge --squash --delete-branch "$PR_URL"; then
+              merged=1
+              break
+            fi
+            echo "merge attempt $attempt failed; base branch may have moved - retrying"
+            sleep 15
+          done
+          if [ -z "$merged" ]; then
+            echo "::error::gate passed but the merge did not land after 3 attempts; the bump is unmerged and no deploy was dispatched"
+            exit 1
+          fi
+          # A merge made with GITHUB_TOKEN raises no push event -- GitHub suppresses
+          # them so workflows cannot retrigger themselves -- so deploy would never run
+          # and the site would keep serving the previous build. Ask for it explicitly;
+          # a workflow_dispatch through the API is not suppressed. The dispatched run
+          # is the same gate-then-deploy pipeline, so a bad merge still ships nothing.
+          gh workflow run deploy.yml --repo "$GITHUB_REPOSITORY" --ref main
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

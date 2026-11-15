@@ -1,0 +1,249 @@
+{
+  "$comment": [
+    "§4.1c mutation coverage. Each of the brief's eight mutations is recorded as a CONCRETE PATCH — the file, an anchor that must occur exactly once, and its replacement — never as a sentence describing an edit.",
+    "A kill is defined by five rules and mutations/run.mjs enforces all five: the owning test PASSED unmutated in the same run; the patch actually CHANGED the file; the mutated source still TYPE-CHECKS (a patch that does not compile is DOES NOT BUILD and is never a kill); the run served the MUTATED code (Playwright runs set CI=1 so reuseExistingServer is false and a fresh build is forced on this lab's own port 4236, and the built bundle's hash must move); and the failure is the OWNING test's rather than a build error, a server that never started or a connection refused.",
+    "Every `observed` record below is written by the runner at the moment it ran, never typed. e2e/global-teardown.ts enforces the other half for Playwright records: a record whose killing test PASSED without executing the shared marker helper on the record's marker fails the run, so a commented-out or renamed assertion cannot stand in for one that executed.",
+    "Each mutation breaks the MECHANISM, not a displayed flag.",
+    "The `brief` field is a stable label for the build brief that specified each mutation. That brief is deliberately NOT committed here — a snapshot of one conversation ages into a second, wrong account of the lab — so the label is an identifier, not a pointer to a file in this repo. What a record means is in its `why`."
+  ],
+  "port": 4236,
+  "mutations": [
+    {
+      "id": "lift-digit-zero",
+      "brief": "brief-1",
+      "file": "src/attack/smart.ts",
+      "find": "  const digit = mod((defect / p) * modInv(2n * P.y, p), p);",
+      "replace": "  const digit = 0n;",
+      "runner": "vitest",
+      "spec": "src/attack/smart.test.ts",
+      "grep": "lift digits are 20 for P and 40 for Q",
+      "why": "Sets the Hensel lift digit to zero, so the lifted point no longer satisfies the curve equation modulo p² and the whole formal-group argument rests on nothing. The published digits 20 and 40 are what the owning test asserts, from Smart (1999) rather than from this code.",
+      "observed": {
+        "at": "2026-11-15T21:02:16.440Z",
+        "runner": "vitest",
+        "baselinePassed": true,
+        "baselineTests": 1,
+        "patchChangedFile": true,
+        "typeChecks": true,
+        "restored": true,
+        "verdict": "KILLED",
+        "killedBy": [
+          "src/attack/smart.test.ts > Smart's attack — Smart's published example (p = 43) > lift digits are 20 for P and 40 for Q, so the lifted y-coordinates are 876 and 1756 mod 1849",
+          "src/attack/smart.test.ts > Smart's attack — Smart's published example (p = 43) > lift digits are 20 for P and 40 for Q, so the lifted y-coordinates are 876 and 1756 mod 1849"
+        ]
+      }
+    },
+    {
+      "id": "multiply-mod-p-not-p2",
+      "brief": "brief-2",
+      "file": "src/attack/smart.ts",
+      "find": "  const { point, ops } = mul(curve, p - 1n, lifted, p2);",
+      "replace": "  const { point, ops } = mul(curve, p - 1n, lifted, p);",
+      "runner": "vitest",
+      "spec": "src/attack/smart.test.ts",
+      "grep": "ψ(pP′)/p = 19 and ψ(pQ′)/p = 3",
+      "why": "Does the multiplication by p − 1 modulo p instead of p². The second level is the whole attack: modulo p the result is just −P and carries no p-adic information, so the ψ values the paper publishes cannot come out.",
+      "observed": {
+        "at": "2026-11-15T21:02:19.697Z",
+        "runner": "vitest",
+        "baselinePassed": true,
+        "baselineTests": 1,
+        "patchChangedFile": true,
+        "typeChecks": true,
+        "restored": true,
+        "verdict": "KILLED",
+        "killedBy": [
+          "src/attack/smart.test.ts > Smart's attack — Smart's published example (p = 43) > ψ(pP′)/p = 19 and ψ(pQ′)/p = 3",
+          "src/attack/smart.test.ts > Smart's attack — Smart's published example (p = 43) > ψ(pP′)/p = 19 and ψ(pQ′)/p = 3"
+        ]
+      }
+    },
+    {
+      "id": "drop-final-exponentiation",
+      "brief": "brief-3",
+      "file": "src/attack/pairing.ts",
+      "find": "  const value = F.pow(miller.f, exponent);",
+      "replace": "  const value = miller.f;",
+      "runner": "vitest",
+      "spec": "src/attack/pairing.test.ts",
+      "grep": "match the reference table",
+      "why": "Returns the raw Miller value instead of raising it to (p² − 1)/n. Without the final exponentiation the value depends on the choice of function representative, the F_p factors are never killed, and the result is not an n-th root of unity — so it is not the pairing the brief's table records.",
+      "observed": {
+        "at": "2026-11-15T21:02:22.339Z",
+        "runner": "vitest",
+        "baselinePassed": true,
+        "baselineTests": 3,
+        "patchChangedFile": true,
+        "typeChecks": true,
+        "restored": true,
+        "verdict": "KILLED",
+        "killedBy": [
+          "src/attack/pairing.test.ts > the reduced Tate pairing with the distortion map > n of 16 bits: p = 199483, n = 49871 > α = t(P, φ(P)) and β = t(R, φ(P)) match the reference table",
+          "src/attack/pairing.test.ts > the reduced Tate pairing with the distortion map > n of 24 bits: p = 54288523, n = 13572131 > α = t(P, φ(P)) and β = t(R, φ(P)) match the reference table",
+          "src/attack/pairing.test.ts > the reduced Tate pairing with the distortion map > n of 32 bits: p = 72626871211, n = 2593816829 > α = t(P, φ(P)) and β = t(R, φ(P)) match the reference table",
+          "src/attack/pairing.test.ts > the reduced Tate pairing with the distortion map > n of 16 bits: p = 199483, n = 49871 > α = t(P, φ(P)) and β = t(R, φ(P)) match the reference table",
+          "src/attack/pairing.test.ts > the reduced Tate pairing with the distortion map > n of 24 bits: p = 54288523, n = 13572131 > α = t(P, φ(P)) and β = t(R, φ(P)) match the reference table",
+          "src/attack/pairing.test.ts > the reduced Tate pairing with the distortion map > n of 32 bits: p = 72626871211, n = 2593816829 > α = t(P, φ(P)) and β = t(R, φ(P)) match the reference table"
+        ]
+      }
+    },
+    {
+      "id": "distortion-map-identity",
+      "brief": "brief-4",
+      "file": "src/attack/pairing.ts",
+      "find": "  return { x: F.el(-P.x, 0n), y: F.el(0n, P.y) };",
+      "replace": "  return { x: F.el(P.x, 0n), y: F.el(P.y, 0n) };",
+      "runner": "vitest",
+      "spec": "src/attack/mov.test.ts",
+      "grep": "recovers l on the",
+      "why": "Replaces φ(x, y) = (−x, i·y) by the identity, so the second argument is no longer independent of the first. The self-pairing t(P, P) is trivial on this family, which is exactly why a distortion map is needed, so the reduction degenerates and recovers nothing.",
+      "observed": {
+        "at": "2026-11-15T21:02:26.045Z",
+        "runner": "vitest",
+        "baselinePassed": true,
+        "baselineTests": 3,
+        "patchChangedFile": true,
+        "typeChecks": true,
+        "restored": true,
+        "verdict": "KILLED",
+        "killedBy": [
+          "src/attack/mov.test.ts > the MOV reduction end to end > recovers l on the 16-bit instance and the independent verifier confirms l·P = R",
+          "src/attack/mov.test.ts > the MOV reduction end to end > recovers l on the 24-bit instance and the independent verifier confirms l·P = R",
+          "src/attack/mov.test.ts > the MOV reduction end to end > recovers l on the 32-bit instance and the independent verifier confirms l·P = R",
+          "src/attack/mov.test.ts > the MOV reduction end to end > recovers l on the 16-bit instance and the independent verifier confirms l·P = R",
+          "src/attack/mov.test.ts > the MOV reduction end to end > recovers l on the 24-bit instance and the independent verifier confirms l·P = R",
+          "src/attack/mov.test.ts > the MOV reduction end to end > recovers l on the 32-bit instance and the independent verifier confirms l·P = R"
+        ]
+      }
+    },
+    {
+      "id": "count-forgets-infinity",
+      "brief": "brief-5",
+      "file": "src/ec/count.ts",
+      "find": "  let order = 1n; // the point at infinity",
+      "replace": "  let order = 0n; // the point at infinity",
+      "runner": "playwright",
+      "spec": "e2e/claims.spec.ts",
+      "grep": "the point count is right",
+      "marker": "count-order",
+      "helper": "readClaim",
+      "why": "Drops the point at infinity from #E, so every count is one short and Smart's curve reports 42 rather than 43. The owning claims test counts the same curve independently, by Euler's criterion rather than the page's residue table, and compares.",
+      "observed": {
+        "at": "2026-11-15T21:02:28.580Z",
+        "runner": "playwright",
+        "baselinePassed": true,
+        "bundleBefore": "36b399ce7f4fbf22663c9dc082095d71",
+        "patchChangedFile": true,
+        "typeChecks": true,
+        "bundleAfter": "44c5ff51bfbb739c1bc5ada7dcb997c6",
+        "restored": true,
+        "verdict": "KILLED",
+        "killedBy": [
+          "[claims] › e2e/claims.spec.ts:130:3 › displayed claims › the point count is right: an independent count of the same curve agrees with the number on screen"
+        ]
+      }
+    },
+    {
+      "id": "giant-step-off-by-one",
+      "brief": "brief-6",
+      "file": "src/attack/bsgs.ts",
+      "find": "  for (let i = 0n; i < m; i++) {",
+      "replace": "  for (let i = 0n; i < m - 1n; i++) {",
+      "runner": "vitest",
+      "spec": "src/attack/bsgs.test.ts",
+      "grep": "finds a logarithm that lies in the LAST giant step",
+      "why": "Stops the giant-step walk one iteration early, so every logarithm in the final block is reported as not found. The owning test uses l = n − 1 on the 32-bit instance, which the arithmetic in that test shows is reachable only on iteration m − 1.",
+      "observed": {
+        "at": "2026-11-15T21:02:36.617Z",
+        "runner": "vitest",
+        "baselinePassed": true,
+        "baselineTests": 1,
+        "patchChangedFile": true,
+        "typeChecks": true,
+        "restored": true,
+        "verdict": "KILLED",
+        "killedBy": [
+          "src/attack/bsgs.test.ts > baby-step giant-step > finds a logarithm that lies in the LAST giant step",
+          "src/attack/bsgs.test.ts > baby-step giant-step > finds a logarithm that lies in the LAST giant step"
+        ]
+      }
+    },
+    {
+      "id": "verifier-ignores-y",
+      "brief": "brief-7",
+      "file": "src/check/verify.ts",
+      "find": "  else ok = computed.x === Q.x && computed.y === Q.y;",
+      "replace": "  else ok = computed.x === Q.x;",
+      "runner": "vitest",
+      "spec": "src/check/verify.test.ts",
+      "grep": "compares BOTH coordinates",
+      "why": "Makes the independent check compare x-coordinates only, so it accepts m and −m alike and would confirm a recovered scalar that is wrong by a sign. (x, −y) is a different point on the curve, and the owning test says so with Smart's own published pair.",
+      "observed": {
+        "at": "2026-11-15T21:02:39.854Z",
+        "runner": "vitest",
+        "baselinePassed": true,
+        "baselineTests": 1,
+        "patchChangedFile": true,
+        "typeChecks": true,
+        "restored": true,
+        "verdict": "KILLED",
+        "killedBy": [
+          "src/check/verify.test.ts > the independent verifier > compares BOTH coordinates: (x, −y) is a different point",
+          "src/check/verify.test.ts > the independent verifier > compares BOTH coordinates: (x, −y) is a different point"
+        ]
+      }
+    },
+    {
+      "id": "smart-drops-anomalous-precondition",
+      "brief": "brief-8",
+      "file": "src/attack/smart.ts",
+      "find": "  if (certificate.order !== curve.p) {",
+      "replace": "  if (certificate.order === 0n) {",
+      "runner": "playwright",
+      "spec": "e2e/claims.spec.ts",
+      "grep": "names the actual cause when it refuses",
+      "marker": "smart-result",
+      "helper": "expectVerdict",
+      "why": "Removes the #E = p precondition, so the attack runs on a curve where the formal-group map is not defined and emits a number instead of a refusal. The owning claims test drives the non-anomalous preset and requires the verdict to name the counted order and p.",
+      "observed": {
+        "at": "2026-11-15T21:02:44.710Z",
+        "runner": "playwright",
+        "baselinePassed": true,
+        "bundleBefore": "36b399ce7f4fbf22663c9dc082095d71",
+        "patchChangedFile": true,
+        "typeChecks": true,
+        "bundleAfter": "a015e11feabad1770f08be0922f622e0",
+        "restored": true,
+        "verdict": "KILLED",
+        "killedBy": [
+          "[claims] › e2e/claims.spec.ts:240:3 › displayed claims › Smart's attack names the actual cause when it refuses a curve that is not anomalous"
+        ]
+      }
+    },
+    {
+      "id": "control-border-dissolves",
+      "brief": "gate-proof",
+      "file": "src/style.css",
+      "find": "  --control-border: #626d7a;",
+      "replace": "  --control-border: #161b22;",
+      "runner": "playwright",
+      "spec": "e2e/a11y.spec.ts",
+      "grep": "no WCAG A/AA violations in the shipped dark theme at 380px",
+      "why": "Not one of the brief's eight. A gate that has never failed is not evidence, so this degrades the one token every control boundary on the page draws its edge from, setting it to the panel surface it sits on. Every button and every text input then has a 1:1 boundary against its own card, which is the WCAG 1.4.11 failure the non-text oracle exists to find — and which axe has no rule for, so only that oracle can report it. It also proves the bundle-hash check covers CSS.",
+      "observed": {
+        "at": "2026-11-15T21:03:16.472Z",
+        "runner": "playwright",
+        "baselinePassed": true,
+        "bundleBefore": "36b399ce7f4fbf22663c9dc082095d71",
+        "patchChangedFile": true,
+        "typeChecks": true,
+        "bundleAfter": "c3047e687913623cb2c2b9fa3603551a",
+        "restored": true,
+        "verdict": "KILLED",
+        "killedBy": [
+          "[a11y] › e2e/a11y.spec.ts:37:1 › no WCAG A/AA violations in the shipped dark theme at 380px"
+        ]
+      }
+    }
+  ]
+}

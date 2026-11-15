@@ -1,0 +1,208 @@
+/* Weak Curves — theme + component styles. Dark is the only theme (:root).
+   The always-dark shared top bar owns its own styles; base element rules here
+   are scoped to #app so they never fight it. */
+
+:root {
+  color-scheme: dark;
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-2: #1b2230;
+  --border: #2b3440;
+  --control-border: #626d7a;
+  --text: #e6edf3;
+  --text-dim: #b3bdc8; /* muted via lower lightness, never opacity */
+  --accent: #5fb49c; /* brand accent — also read by the shared header */
+  --accent-ink: #07150f; /* text on an accent fill: derived from the accent, 9:1 */
+  --accent-text: #7fd2bb; /* accent as text / links / borders on the page bg */
+  --ok: #4ac26b;
+  --ok-text: #7ee29a;
+  --bad: #f85149;
+  --bad-text: #ff8b84;
+  --alarm: #e8a13c;
+  --alarm-text: #f4bd6a;
+  --info: #6aa5e8;
+  --info-text: #9cc3f2;
+  --radius: 10px;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html { background-color: var(--bg); } /* longhand — axe/WebKit miss the shorthand */
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.55;
+}
+
+#app { max-width: 960px; margin: 0 auto; padding: 0 clamp(0.9rem, 3vw, 2rem) 3rem; }
+#app a { color: var(--accent-text); text-decoration: underline; text-underline-offset: 2px; }
+#app code { font-family: var(--mono); }
+#app :is(button, input, summary, [tabindex]):focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+#app h2 { font-size: 1.35rem; margin: 0 0 0.5rem; }
+#app h3 { font-size: 1.05rem; margin: 0.6rem 0 0.2rem; }
+#app p { margin: 0 0 0.6rem; }
+#app q { quotes: "“" "”"; }
+
+/* ---------- hero (this lab owns it; fleet-consistent by review) ---------- */
+.cl-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:clamp(1rem,4vw,3rem);flex-wrap:wrap;margin:clamp(1rem,3vw,2rem) 0 1.5rem;}
+.cl-hero-main{flex:1 1 22rem;min-width:min(100%,20rem);}
+.cl-hero-title{margin:0;font-size:clamp(1.6rem,3.8vw,2.7rem);font-weight:700;line-height:1.1;letter-spacing:.01em;}
+.cl-hero-sub{margin:.4rem 0 0;font-size:clamp(.9rem,1.6vw,1.05rem);letter-spacing:.01em;opacity:.85;}
+.cl-hero-desc{margin:.55rem 0 0;font-size:1rem;line-height:1.5;color:var(--text-dim);max-width:60ch;}
+.cl-hero-why{flex:0 1 min(40%,26rem);min-width:min(100%,15rem);border:1px solid var(--border);border-radius:10px;padding:.85rem 1.05rem;background:color-mix(in oklab,var(--accent) 6%,transparent);}
+.cl-hero-why-label{display:block;font-size:.68rem;font-weight:700;letter-spacing:.14em;}
+.cl-hero-why-text{margin:.35rem 0 0;font-size:.95rem;line-height:1.5;}
+@media (max-width:640px){.cl-hero{flex-direction:column;}.cl-hero-main{flex-basis:auto;min-width:0;}.cl-hero-why{flex-basis:auto;width:100%;}}
+.cl-hero-why{box-sizing:border-box;}
+.cl-hero-sub { color: var(--accent-text); opacity: 1; }
+.cl-hero-why-label { color: var(--accent-text); }
+
+/* ---------- tabs ---------- */
+.tabs { margin: 0.5rem 0 1.25rem; }
+.tab-list { display: flex; flex-wrap: wrap; gap: 0.4rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+.tab-btn {
+  font: inherit; font-size: 0.9rem; font-weight: 600; color: var(--text-dim);
+  background: transparent; border: 1px solid transparent; border-radius: var(--radius);
+  padding: 0.45rem 0.8rem; cursor: pointer;
+}
+/* The hover fill needs an edge of its own (SC 1.4.11): --control-border clears 3:1 on the page. */
+.tab-btn:hover { color: var(--text); background: var(--surface-2); border-color: var(--control-border); }
+/* The active tab's border is --accent-ink, not the fill colour, so the selected control has an edge of its own. */
+.tab-btn.active { color: var(--accent-ink); background: var(--accent); border-color: var(--accent-ink); }
+
+/* ---------- panels ---------- */
+.panel { animation: fade 0.2s ease; }
+.panel-intro p { color: var(--text-dim); max-width: 70ch; }
+
+.controls {
+  display: grid; gap: 0.9rem; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.1rem; margin: 1rem 0;
+}
+.control { display: grid; gap: 0.35rem; }
+.control > label, .control-label { font-weight: 600; font-size: 0.9rem; margin: 0; }
+.input-row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: flex-end; }
+.help { font-size: 0.82rem; color: var(--text-dim); margin: 0.1rem 0 0; }
+
+.mono-input {
+  font-family: var(--mono); font-size: 0.9rem; width: 100%; box-sizing: border-box;
+  background: var(--bg); color: var(--text); border: 1px solid var(--control-border);
+  border-radius: 8px; padding: 0.5rem 0.6rem;
+}
+.mono-input.narrow { width: 9rem; max-width: 100%; }
+.mono-input[aria-invalid="true"] { border-color: var(--bad); }
+
+.radio { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; }
+.radio input { accent-color: var(--accent); }
+
+.btn {
+  font: inherit; font-weight: 600; font-size: 0.88rem; border-radius: 8px; padding: 0.5rem 0.9rem;
+  cursor: pointer; border: 1px solid var(--control-border);
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-ink); }
+.btn-primary:hover:not(:disabled) { filter: brightness(1.06); }
+.btn-ghost { background: var(--surface-2); color: var(--text); }
+.btn-ghost:hover:not(:disabled) { border-color: var(--accent-text); }
+
+/* ---------- output / fields ---------- */
+.output, .result-area { display: grid; gap: 0.8rem; margin-top: 0.5rem; }
+.result-area:empty { display: none; }
+.field { display: grid; gap: 0.2rem; }
+.field-label { font-size: 0.8rem; font-weight: 600; color: var(--text-dim); }
+.field-sub { font-weight: 400; }
+.field-value {
+  font-family: var(--mono); font-size: 0.84rem; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 0.35rem 0.5rem; overflow-wrap: anywhere; color: var(--text);
+}
+.field-value.plain { font-family: var(--sans); }
+
+/* ---------- verdicts (icon + text + colour, keyed on data-tone) ---------- */
+.verdict {
+  display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.92rem; border-radius: 8px;
+  padding: 0.6rem 0.8rem; border: 1px solid var(--border); border-left-width: 4px; color: var(--text);
+  background: var(--surface);
+}
+.verdict-icon { font-size: 1.1rem; line-height: 1.3; }
+.verdict-body { display: grid; gap: 0.4rem; min-width: 0; }
+.verdict-headline { font-weight: 700; letter-spacing: 0.01em; }
+.verdict-detail { margin: 0; color: var(--text-dim); font-size: 0.88rem; }
+.verdict[data-tone="pass"] { background: color-mix(in oklab, var(--ok) 16%, var(--surface)); border-color: var(--ok); }
+.verdict[data-tone="pass"] .verdict-icon { color: var(--ok-text); }
+.verdict[data-tone="fail"] { background: color-mix(in oklab, var(--bad) 15%, var(--surface)); border-color: var(--bad); }
+.verdict[data-tone="fail"] .verdict-icon { color: var(--bad-text); }
+.verdict[data-tone="alarm"] { background: color-mix(in oklab, var(--alarm) 20%, var(--surface)); border-color: var(--alarm); }
+.verdict[data-tone="alarm"] .verdict-icon { color: var(--alarm-text); }
+.verdict[data-tone="info"] { background: color-mix(in oklab, var(--info) 14%, var(--surface)); border-color: var(--info); }
+.verdict[data-tone="info"] .verdict-icon { color: var(--info-text); }
+.negative-claim { margin: 0.2rem 0 0; font-weight: 600; color: var(--text); }
+
+/* ---------- callouts ---------- */
+.callout { border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.88rem; border: 1px solid var(--border); margin: 0.9rem 0; }
+.callout code { background: var(--surface-2); padding: 0.05em 0.3em; border-radius: 4px; }
+.callout-info { background: var(--surface); color: var(--text-dim); }
+.callout-info strong { color: var(--text); }
+.callout-danger { background: color-mix(in oklab, var(--bad) 12%, var(--surface)); border-color: var(--bad); color: var(--text); }
+.callout-caveat { background: color-mix(in oklab, var(--alarm) 12%, var(--surface)); border-color: var(--alarm); color: var(--text); }
+
+/* ---------- stepper ---------- */
+.stepper { display: grid; gap: 0.8rem; }
+.stepper-controls { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.step-progress { font-size: 0.85rem; color: var(--text-dim); margin: 0 0 0 auto; }
+.step-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.7rem; }
+.step-line {
+  display: grid; gap: 0.5rem; background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--accent); border-radius: 8px; padding: 0.7rem 0.85rem;
+}
+.step-line p { color: var(--text-dim); font-size: 0.9rem; margin: 0; }
+.step-tag { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; color: var(--accent-text); }
+.reveal { animation: reveal 0.25s ease; }
+
+/* ---------- tables and scroll regions ---------- */
+.rows-table { border-collapse: collapse; font-size: 0.85rem; }
+.rows-table caption { text-align: left; font-size: 0.8rem; color: var(--text-dim); padding-bottom: 0.3rem; }
+.rows-table th, .rows-table td { text-align: left; padding: 0.3rem 0.7rem; border-bottom: 1px solid var(--border); font-family: var(--mono); }
+.rows-table thead th { background: var(--surface-2); font-family: var(--sans); font-size: 0.78rem; }
+.table-wrap { overflow: auto; max-height: 18rem; border: 1px solid var(--control-border); border-radius: 8px; background: var(--bg); }
+.miller-rows { list-style: none; margin: 0; padding: 0.4rem 0.6rem; display: grid; gap: 0.3rem; font-size: 0.82rem; }
+.miller-rows li { display: grid; grid-template-columns: 4.5rem 1fr; gap: 0.3rem 0.8rem; align-items: baseline; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+.miller-rows li code { overflow-wrap: anywhere; }
+.miller-kind { font-weight: 700; color: var(--accent-text); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.miller-T { grid-column: 2; color: var(--text-dim); overflow-wrap: anywhere; }
+
+/* ---------- disclosures ---------- */
+#app summary { cursor: pointer; font-weight: 600; }
+.disclosure { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.85rem; background: var(--surface); }
+.disclosure > *:not(summary) { margin-top: 0.6rem; }
+
+/* ---------- weak-curve cards ---------- */
+.weak-card { display: grid; gap: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem; }
+
+/* ---------- footer ---------- */
+.scripture-footer { margin-top: 2.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.85rem; }
+.scripture-footer p { margin: 0.4rem 0; }
+.footer-links a { color: var(--accent-text); }
+
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes reveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .panel, .reveal { animation: none; }
+  * { transition: none !important; }
+}
+
+@media (max-width: 640px) {
+  .mono-input.narrow { width: 100%; }
+  .input-row > .control { flex: 1 1 100%; }
+}
+
+/* Touch targets on coarse pointers. */
+@media (pointer: coarse) {
+  #app .btn, #app .tab-btn { min-height: 44px; }
+}
+
+/* ---------- compute-both-sides comparison ---------- */
+.both-sides { display: grid; gap: 0.5rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.8rem; }
+.both-sides-eq { margin: 0; font-size: 0.88rem; color: var(--text-dim); }

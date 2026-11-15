@@ -1,0 +1,17 @@
+node_modules
+dist
+.DS_Store
+*.local
+playwright-report
+test-results
+public/deployment.json
+chat.md
+CRYPTO-LAB-TEMPLATE*.md
+
+# The build brief and the local copy of the fleet template stay OUT of the repo.
+# A committed copy of either ages silently into a second, wrong account of what
+# this lab does; the template says so about itself. Provenance that a reader of
+# this repo needs lives in README.md and in the test files instead.
+brief.md
+*-brief.md
+_MASTER-TEMPLATE.md
