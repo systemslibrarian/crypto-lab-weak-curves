@@ -21,6 +21,16 @@
  *      P': ψ(p·P')/p ≡ ((x₂ − x₁)/p)·(y₂ − y₁)⁻¹ (mod p).
  *   3. DIVIDE.  ψ is linear, so ψ(p·Q') = m·ψ(p·P') and m = ψ(p·Q')/ψ(p·P').
  *
+ * The canonical lift. Step 1 keeps the curve's own coefficients modulo p².
+ * When that integer curve happens to be the canonical lift, ψ(p·P') ≡ 0
+ * (mod p²) for every P' and step 3 would divide by zero. Smart notes this and
+ * the cure: lift to a different curve that agrees with E modulo p. For
+ * y² = x³ + b (j = 0) the same-coefficient lift is ALWAYS canonical, so every
+ * anomalous curve of that shape — including the ones Miyaji (AUSCRYPT '92)
+ * recommended for smart cards — needs the second lift. The attack therefore
+ * re-lifts onto y² = x³ + a2x² + (a4 + k·p)x + (a6 + k·p) for k = 1, 2, …
+ * whenever ψ(p·P')/p comes out 0, and the trace records which lift it used.
+ *
  * Cost: two scalar multiplications by p − 1 modulo p² — O(log p) curve
  * operations, counted and printed — against the ~2√p a generic method needs.
  */
@@ -59,6 +69,10 @@ export interface SmartTrace {
   readonly psiP: PsiStep;
   readonly psiQ: PsiStep;
   readonly candidate: bigint;
+  /** The integer curve the lifts were taken on (equal to the input curve modulo p). */
+  readonly liftCurve: Curve;
+  /** How many lifts were discarded as canonical (ψ(p·P') ≡ 0) before this one. */
+  readonly relifts: number;
   /** Total curve operations the attack performed. */
   readonly ops: number;
   /** 2⌈√p⌉: the generic square-root count for a group of order p. */
@@ -68,6 +82,18 @@ export interface SmartTrace {
 export type SmartResult =
   | { readonly ok: false; readonly kind: 'refused' | 'failed'; readonly reason: string }
   | { readonly ok: true; readonly trace: SmartTrace; readonly candidate: bigint };
+
+/** Re-lifts tried after a canonical lift before the attack reports failure. */
+export const MAX_RELIFTS = 8;
+
+/**
+ * The integer curve used for the lift: k = 0 is the curve's own coefficients;
+ * k ≥ 1 adds k·p to a4 and a6, which changes nothing modulo p.
+ */
+export function liftCurve(curve: Curve, k: bigint): Curve {
+  if (k === 0n) return curve;
+  return { p: curve.p, a2: curve.a2, a4: curve.a4 + k * curve.p, a6: curve.a6 + k * curve.p };
+}
 
 export function liftPoint(curve: Curve, P: AffinePoint): Lift {
   const { p } = curve;
@@ -118,25 +144,41 @@ export function smartAttack(curve: Curve, P: Point, Q: Point, certificate: Point
   const Qa = Q as AffinePoint;
   const { p } = curve;
   try {
-    const liftP = liftPoint(curve, Pa);
-    const liftQ = liftPoint(curve, Qa);
-    const psiP = psiOverP(curve, liftP.lifted);
-    const psiQ = psiOverP(curve, liftQ.lifted);
-    const candidate = mod(psiQ.psiOverP * modInv(psiP.psiOverP, p), p);
-    return {
-      ok: true,
-      candidate,
-      trace: {
-        p,
-        p2: p * p,
-        liftP,
-        liftQ,
-        psiP,
-        psiQ,
+    let discardedOps = 0;
+    for (let k = 0; k <= MAX_RELIFTS; k++) {
+      const lc = liftCurve(curve, BigInt(k));
+      const liftP = liftPoint(lc, Pa);
+      const psiP = psiOverP(lc, liftP.lifted);
+      if (psiP.psiOverP === 0n) {
+        // Canonical lift: ψ vanishes on everything, so try the next lift.
+        discardedOps += psiP.ops;
+        continue;
+      }
+      const liftQ = liftPoint(lc, Qa);
+      const psiQ = psiOverP(lc, liftQ.lifted);
+      const candidate = mod(psiQ.psiOverP * modInv(psiP.psiOverP, p), p);
+      return {
+        ok: true,
         candidate,
-        ops: psiP.ops + psiQ.ops,
-        sqrtOps: sqrtMethodOps(p),
-      },
+        trace: {
+          p,
+          p2: p * p,
+          liftP,
+          liftQ,
+          psiP,
+          psiQ,
+          candidate,
+          liftCurve: lc,
+          relifts: k,
+          ops: discardedOps + psiP.ops + psiQ.ops,
+          sqrtOps: sqrtMethodOps(p),
+        },
+      };
+    }
+    return {
+      ok: false,
+      kind: 'failed',
+      reason: `ψ(p·P′) ≡ 0 on ${MAX_RELIFTS + 1} different lifts: each one behaved as the canonical lift, so the division has nothing to divide by`,
     };
   } catch (error) {
     if (error instanceof NonInvertibleError) {

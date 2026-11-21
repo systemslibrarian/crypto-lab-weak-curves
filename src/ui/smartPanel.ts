@@ -124,6 +124,12 @@ export function buildStepper(
       h('p', {}, `#E = ${order} = p. The curve is anomalous, so the attack may proceed. (A curve with any other count is refused before this line — see the third preset.)`)),
     h('div', {},
       h('p', {}, `Keep x, change y so the equation holds modulo p² = ${t.p2}. The Hensel digit is t = ((f(x) − y²)/p)·(2y)⁻¹ mod p.`),
+      ...(t.relifts > 0
+        ? [
+            h('p', {}, `The first lift, on the curve’s own coefficients, was the canonical lift: ψ(p·P′) came out 0, so the division in the last step would have had nothing to divide by. That always happens for y² = x³ + b. The attack lifted again onto a different curve that is the same curve modulo p (${t.relifts} lift${t.relifts === 1 ? '' : 's'} discarded).`),
+            field('Lift curve, modulo p²', formatCurve(t.liftCurve)),
+          ]
+        : []),
       claim(`${idPrefix}-liftP`, 'Lift digit for P', String(t.liftP.digit), { raw: String(t.liftP.digit) }),
       field("P′ = (x, y + t·p) mod p²", pointText(t.liftP.lifted)),
       field('Check y′² ≡ f(x) (mod p²)', t.liftP.satisfiesCurveModP2 ? 'holds' : 'FAILS')),

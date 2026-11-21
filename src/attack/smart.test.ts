@@ -6,7 +6,7 @@
  * judge it.
  */
 import { describe, expect, it } from 'vitest';
-import { checkSmartPreconditions, liftPoint, psiOverP, smartAttack } from './smart';
+import { checkSmartPreconditions, liftCurve, liftPoint, psiOverP, smartAttack } from './smart';
 import { countPoints, type PointCount } from '../ec/count';
 import { mul, type Curve, type Point } from '../ec/curve';
 import { verifyLogarithm } from '../check/verify';
@@ -177,4 +177,109 @@ describe("Smart's attack — isolation of the secret", () => {
       expect(verifyLogarithm(curve, P, Q, result.candidate).ok).toBe(true);
     }
   });
+});
+
+/**
+ * The canonical-lift trap. For y² = x³ + b the lift on the curve's own
+ * coefficients is the canonical lift, so ψ(p·P′) ≡ 0 and a single-lift attack
+ * divides by zero on EVERY such anomalous curve. The curves below are found by
+ * enumeration here (p = 3b² + 3b + 1 primes, the shape that admits j = 0
+ * anomalous curves), and Miyaji's three 128-bit curves are copied from
+ * A. Miyaji, "Elliptic curves over F_p suitable for cryptosystems",
+ * AUSCRYPT '92, LNCS 718, §4.2 (pp. 10 and 12 of the JAIST copy).
+ */
+describe("Smart's attack — curves y² = x³ + b, where the first lift is canonical", () => {
+  const primes = [127n, 271n, 331n, 397n, 547n, 631n, 919n, 1657n];
+
+  function firstAnomalousJ0(p: bigint): { curve: Curve; certificate: PointCount } {
+    for (let b = 1n; b < p; b++) {
+      const curve: Curve = { p, a2: 0n, a4: 0n, a6: b };
+      const certificate = certify(curve);
+      if (certificate.order === p) return { curve, certificate };
+    }
+    throw new Error(`no anomalous y² = x³ + b over F_${p}`);
+  }
+
+  for (const p of primes) {
+    it(`p = ${p}: the same-coefficient lift gives ψ(p·P′) = 0, and the re-lift recovers seeded secrets`, () => {
+      const { curve, certificate } = firstAnomalousJ0(p);
+      const source = seededSource(Number(p));
+      const P = randomPoint(curve, source);
+      expect(psiOverP(curve, liftPoint(curve, P as { x: bigint; y: bigint }).lifted).psiOverP).toBe(0n);
+      for (let i = 0; i < 5; i++) {
+        const secret = randomScalar(p, source);
+        const Q = mul(curve, secret, P).point;
+        const result = smartAttack(curve, P, Q, certificate);
+        expect(result.ok, `p = ${p}, trial ${i}`).toBe(true);
+        if (!result.ok) continue;
+        expect(result.trace.relifts).toBeGreaterThanOrEqual(1);
+        expect(result.candidate).toBe(secret);
+        expect(verifyLogarithm(curve, P, Q, result.candidate).ok).toBe(true);
+      }
+    });
+  }
+
+  it('the published examples still use the first lift (no re-lift, unchanged trace)', () => {
+    for (const ex of [SMART_1999, MONNERAT_2002]) {
+      const result = smartAttack(ex.curve, ex.P, ex.Q, certify(ex.curve));
+      expect(result.ok).toBe(true);
+      if (!result.ok) continue;
+      expect(result.trace.relifts).toBe(0);
+      expect(result.trace.liftCurve).toEqual(ex.curve);
+    }
+  });
+
+  it('liftCurve(k) agrees with the curve modulo p', () => {
+    const c: Curve = { p: 127n, a2: 0n, a4: 0n, a6: 3n };
+    const l = liftCurve(c, 3n);
+    expect([l.a2 % c.p, l.a4 % c.p, l.a6 % c.p]).toEqual([0n, 0n, 3n]);
+  });
+
+  /**
+   * Miyaji's curves are far above the enumeration cap, so the certificate is
+   * built from a proof the test checks: P ≠ O and p·P = O with p prime give
+   * p | #E, and Hasse's bound leaves #E = p as the only multiple of p in range.
+   */
+  const MIYAJI = [
+    {
+      name: 'd = 3, p = 1701 41183 46046 92480 63157 20930 49376 39647',
+      curve: { p: 170141183460469248063157209304937639647n, a2: 0n, a4: 0n, a6: 192n },
+      P: { x: 4n, y: 16n },
+      j0: true,
+    },
+    {
+      name: 'd = 3, p = 2^128 − 86 61755 49264 58706 00985',
+      curve: { p: 2n ** 128n - 8661755492645870600985n, a2: 0n, a4: 0n, a6: 192n },
+      P: { x: 4n, y: 16n },
+      j0: true,
+    },
+    (() => {
+      const p = 170141183460469239560785966224071716369n;
+      const a = 52715357398698261607887303078701255349n;
+      return {
+        name: 'd = 11, y² = x³ + 12a³x + 16a⁴',
+        curve: { p, a2: 0n, a4: (12n * a ** 3n) % p, a6: (16n * a ** 4n) % p },
+        P: { x: 0n, y: (4n * a * a) % p },
+        j0: false,
+      };
+    })(),
+  ];
+
+  for (const m of MIYAJI) {
+    it(`Miyaji's 128-bit curve (${m.name}) is anomalous and falls to the attack`, () => {
+      const { curve, P } = m;
+      expect(mul(curve, curve.p, P).point).toBeNull();
+      const certificate: PointCount = { kind: 'point-count', curve, order: curve.p, trace: 1n };
+      const source = seededSource(1992);
+      const secret = randomScalar(curve.p, source);
+      const Q = mul(curve, secret, P).point;
+      expect(psiOverP(curve, liftPoint(curve, P).lifted).psiOverP === 0n).toBe(m.j0);
+      const result = smartAttack(curve, P, Q, certificate);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.trace.relifts > 0).toBe(m.j0);
+      expect(result.candidate).toBe(secret);
+      expect(verifyLogarithm(curve, P, Q, result.candidate).ok).toBe(true);
+    });
+  }
 });

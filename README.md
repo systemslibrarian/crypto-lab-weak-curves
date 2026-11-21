@@ -19,7 +19,7 @@ n | p^k − 1 for small k      small embedding degree → MOV/Frey–Rück trans
 
 Two attacks are implemented, both hand-rolled so every intermediate value is inspectable:
 
-- **Smart's attack** on a curve with exactly `p` points. Each point is lifted one level up — from arithmetic modulo `p` to arithmetic modulo `p²` — where the group has a hidden *additive* structure. Multiplying by `p` lands in the formal group, where `ψ(S) = −x(S)/y(S)` is a homomorphism onto `pZ/p²Z`, and the logarithm falls out of a single division. Implemented in [`src/attack/smart.ts`](src/attack/smart.ts), after N. P. Smart, *The Discrete Logarithm Problem on Elliptic Curves of Trace One*, Journal of Cryptology **12**(3) (1999) 193–196, in the form J. Monnerat's tutorial (EPFL technical report IC/2002/49, 2002) presents it. The same attack was found independently and in the same period by Satoh and Araki (*Comment. Math. Univ. St. Pauli* **47** (1998) 81–92) and Semaev (*Math. Comp.* **67** (1998) 353–356); SEC 1 calls it the Semaev–Smart–Satoh–Araki attack.
+- **Smart's attack** on a curve with exactly `p` points. Each point is lifted one level up — from arithmetic modulo `p` to arithmetic modulo `p²` — where the group has a hidden *additive* structure. Multiplying by `p` lands in the formal group, where `ψ(S) = −x(S)/y(S)` is a homomorphism onto `pZ/p²Z`, and the logarithm falls out of a single division. Implemented in [`src/attack/smart.ts`](src/attack/smart.ts), after N. P. Smart, *The Discrete Logarithm Problem on Elliptic Curves of Trace One*, Journal of Cryptology **12**(3) (1999) 193–196, in the form J. Monnerat's tutorial (EPFL technical report IC/2002/49, 2002) presents it. The same attack was found independently and in the same period by Satoh and Araki (*Comment. Math. Univ. St. Pauli* **47** (1998) 81–92) and Semaev (*Math. Comp.* **67** (1998) 353–356); SEC 1 calls it the Semaev–Smart–Satoh–Araki attack. One trap is handled explicitly: if the integer curve used for the lift is the *canonical* lift, `ψ(p·P′) ≡ 0` and the division has nothing to divide by. For curves `y² = x³ + b` (j = 0) the lift on the curve's own coefficients is always canonical, so the attack then re-lifts onto `y² = x³ + a2x² + (a4 + k·p)x + (a6 + k·p)` — the same curve modulo `p` — and the stepper shows which lift it used. The tests include A. Miyaji's 128-bit anomalous curves (AUSCRYPT '92), two of which have j = 0.
 - **The MOV reduction** on the supersingular family `y² = x³ + x` over `p ≡ 3 (mod 4)`, where `#E = p + 1` and every prime-order subgroup has embedding degree 2. A pairing carries the logarithm off the curve and into `F_{p²}`, where it is solved by baby-step giant-step. Implemented in [`src/attack/pairing.ts`](src/attack/pairing.ts) and [`src/attack/mov.ts`](src/attack/mov.ts), after A. Menezes, T. Okamoto and S. A. Vanstone, *Reducing elliptic curve logarithms to logarithms in a finite field*, IEEE Transactions on Information Theory **39**(5) (1993) 1639–1646.
 
 **One deliberate difference from the 1991/1993 paper, stated on the page as well as here.** MOV uses the **Weil** pairing with an independent torsion point drawn from the extension field. This lab computes the **reduced Tate pairing** `t(P, Q) = f_{n,P}(Q)^((p² − 1)/n)` with the **distortion map** `φ(x, y) = (−x, i·y)` on one fixed supersingular family — the usual modern presentation, needing far less machinery. The transfer demonstrated is the same; the pairing computed is not the same one, and the page says which it computed.
@@ -75,7 +75,7 @@ Pairing-friendly curves invert the second condition deliberately: BLS12-381 and 
 npm install
 npm run dev              # http://localhost:5173/crypto-lab-weak-curves/
 npm run build            # maintenance controls + typecheck + production build
-npm test                 # 98 unit tests (Vitest)
+npm test                 # 111 unit tests (Vitest)
 npm run test:maintenance # 17 repository-structure controls
 npm run test:a11y        # WCAG 2.1 AA axe gate (builds first)
 npm run test:claims      # the claims suite, incl. the negative claim
@@ -93,9 +93,9 @@ npm run test:mutation    # the §4.1c mutation ledger: 9 patches, applied and re
 
 ## Build & Verify
 
-**144 tests in total**, all run in CI before any deploy.
+**157 tests in total**, all run in CI before any deploy.
 
-- **98 unit tests** (Vitest, colocated `src/**/*.test.ts`).
+- **111 unit tests** (Vitest, colocated `src/**/*.test.ts`).
   - **The published worked examples are the reference values.** [`src/attack/smart.test.ts`](src/attack/smart.test.ts) asserts Smart's lift digits (20 and 40), his `ψ` values (19 and 3) and `m = 16`, and Monnerat's (digits 308 and 561, `ψ` values 367 and 305, `m = 123`) — taken from the papers and independently recomputed twice before this lab was written, never read off this implementation.
   - **The MOV instances were generated for this lab** — no publication prints them — and are **self-certifying**: [`src/attack/mov.test.ts`](src/attack/mov.test.ts) and [`src/attack/pairing.test.ts`](src/attack/pairing.test.ts) assert `l·P = R` by scalar multiplication, which uses no pairing code, alongside `p` prime and `≡ 3 (mod 4)`, `n` prime and dividing `p + 1`, `n·P = O`, `α^n = 1`, `α ≠ 1`, `β = α^l`, and bilinearity `e(aP, φ(P)) = e(P, φ(P))^a` over 20 random `a`.
   - **Every fail-closed path is a named test**: each precondition refusal, `p` not prime, `p = 2` or `3`, a singular curve, a point off the curve, `P = O`, a point with `y = 0`, `Q` outside the subgroup, `m = 0`, `m = 1`, `m = p − 1`, an embedding degree above the cap, and `p` above the enumeration cap.
