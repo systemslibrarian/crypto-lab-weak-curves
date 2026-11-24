@@ -8,7 +8,7 @@ Two elliptic-curve discrete-logarithm breaks, run live in the browser on real (t
 
 ## What It Is
 
-A big prime field does not make a curve safe. **The number of points decides.**
+A big prime field alone does not establish curve security. **The group and subgroup orders can expose weaknesses.** This lab checks two such conditions.
 
 ```
 #E(F_p) = p + 1 − t          t is the trace of Frobenius

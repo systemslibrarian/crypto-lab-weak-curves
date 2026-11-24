@@ -25,7 +25,7 @@ export function renderWeakPanel(root: HTMLElement): void {
   root.append(
     panelIntro(
       '5 · Is this curve weak?',
-      'The two attacks on this page are old enough that the standards wrote checks against them. SEC 1 asks a curve to pass exactly two tests: the subgroup order n must not equal p (otherwise Smart’s attack applies), and p^k must not be 1 modulo n for any small k (otherwise the MOV reduction moves the logarithm into F_{p^k}). Both are cheap. Neither is a security proof.',
+      'The two attacks on this page are old enough that the standards wrote checks against them. Step 8 of the SEC 1 prime-field validation procedure asks for two checks: the subgroup order n must not equal p (otherwise Smart’s attack applies), and p^k must not be 1 modulo n for any small k (otherwise the MOV reduction moves the logarithm into F_{p^k}). Both are cheap. Neither is a security proof.',
       'This exhibit runs those two checks, at full size, on P-256 and secp256k1 with parameters copied from their specifications — and on the weak curves from exhibits 2 and 4, which fail them.',
     ),
   );
@@ -41,7 +41,7 @@ export function renderWeakPanel(root: HTMLElement): void {
 
   root.append(
     note('danger', h('strong', {}, 'Do not conclude anything about a deployed curve from this page beyond these two checks. '),
-      'Passing them rules out exactly the two attacks shown here. It says nothing about twist security, invalid-curve attacks, side channels, or the provenance of the parameters.'),
+      'A pass means n differs from p and no embedding degree was found within the selected search bound. It says nothing about twist security, invalid-curve attacks, side channels, or the provenance of the parameters.'),
     nonGoal('a verdict on any named curve. P-256 and secp256k1 appear only as the subjects of two arithmetic checks whose inputs are copied from SP 800-186 §3.2.1.3 and SEC 2 §2.4.1; nothing on this page claims either curve is weak.'),
     note('info', 'The same two conditions in NIST SP 800-186 Appendix C.1, criteria 4 and 5: ', h('q', {}, SP800_186_C1.wording), ' The 2^10 there is a far larger margin than SEC 1’s 100; both exclude the curves on this page.'),
   );
